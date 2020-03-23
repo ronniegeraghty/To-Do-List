@@ -30,13 +30,13 @@ const item3 = new Item({
   name: "<-- Hit this to delete an item."
 });
 const defaultItems = [item1, item2, item3];
-// Item.insertMany(defaultItems, function(err) {
-//   if (err) {
-//     console.log(err);
-//   } else {
-//     console.log("Default items were added successfully!");
-//   }
-// });
+
+const listSchema = {
+  name: String,
+  items: [itemsSchema]
+};
+
+const List = mongoose.model("List", listSchema);
 
 app.get("/", function(req, res) {
   Item.find({}, function(err, items) {
@@ -59,20 +59,61 @@ app.get("/", function(req, res) {
   });
 });
 
-app.post("/", function(req, res) {
-  const item = req.body.newItem;
+app.get("/:customListName", function(req, res) {
+  const customListName = req.params.customListName;
+  List.findOne({ name: customListName }, function(err, foundList) {
+    if (!err) {
+      if (!foundList) {
+        //Create a new List
+        const list = new List({
+          name: customListName,
+          items: defaultItems
+        });
+        list.save();
+        res.redirect(`/${customListName}`);
+      } else {
+        //Show an existing list
+        res.render("list", {
+          listTitle: foundList.name,
+          newListItems: foundList.items
+        });
+      }
+    }
+  });
+});
 
-  if (req.body.list === "Work") {
-    workItems.push(item);
-    res.redirect("/work");
-  } else {
-    items.push(item);
+app.post("/", function(req, res) {
+  const itemName = req.body.newItem;
+  const listName = req.body.list;
+  const item = new Item({
+    name: itemName
+  });
+
+  if (listName === "Today") {
+    item.save();
     res.redirect("/");
+  } else {
+    List.findOne({ name: listName }, function(err, foundList) {
+      if (err) {
+        console.log(`ERROR: ${err}`);
+      }
+      foundList.items.push(item);
+      foundList.save();
+      res.redirect("/" + listName);
+    });
   }
 });
 
-app.get("/work", function(req, res) {
-  res.render("list", { listTitle: "Work List", newListItems: workItems });
+app.post("/delete", function(req, res) {
+  const checkedItemId = req.body.checkbox;
+  Item.findByIdAndRemove(checkedItemId, function(err) {
+    if (!err) {
+      console.log("Successfully deleted checked item.");
+      res.redirect("/");
+    } else {
+      console.log(`ERROR: ${err}`);
+    }
+  });
 });
 
 app.get("/about", function(req, res) {
